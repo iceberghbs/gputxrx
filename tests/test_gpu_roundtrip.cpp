@@ -178,7 +178,7 @@ int run_probe() {
             bool failed_as_expected = false;
             try {
                 RxSharedBuffer bad;
-                bad.open(*ctx, L"gputxrx1:999999:12345");
+                bad.open(*ctx, L"999999:12345");
             } catch (const std::exception& e) {
                 failed_as_expected = true;
                 std::fprintf(stderr, "       invalid-identifier error: %s\n", e.what());

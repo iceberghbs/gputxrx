@@ -15,7 +15,8 @@
 //     while the publishing handle is open, even from another process). Named
 //     D3D12 handles are therefore NOT used as the identifier.
 //   * Instead the identifier is the manually copied string
-//         gputxrx1:<tx_pid>:<nt_handle_value>
+//         <tx_pid>:<nt_handle_value>
+//     (a legacy "gputxrx1:" prefix is no longer printed or accepted).
 //     The receiver opens the transmitter process with PROCESS_DUP_HANDLE,
 //     duplicates the NT handle with DuplicateHandle(DUPLICATE_SAME_ACCESS), and
 //     opens it with ID3D12Device::OpenSharedHandle as an ID3D12Resource.
@@ -30,6 +31,7 @@
 // receivers releases the resource.
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -57,6 +59,10 @@ struct AdapterInfo {
     uint32_t feature_level = 0; // packed D3D_FEATURE_LEVEL of the created device
     MemoryInfo memory{};
 };
+
+// Optional transfer progress callback: invoked as (bytes_done, total_bytes)
+// after each completed chunk. May be empty (no reporting).
+using ProgressFn = std::function<void(uint64_t done, uint64_t total)>;
 
 // Adapter selection policy: NVIDIA hardware only. Never falls back to the
 // integrated AMD adapter or to a software adapter.
@@ -121,8 +127,8 @@ public:
     // Copies `bytes` (exactly buffer size) into the GPU resource, waits until
     // the GPU work completes and the resource is fully visible, then exports
     // the named shared handle. Only after this returns is `name()` valid to
-    // hand to a receiver.
-    void upload_and_publish(const uint8_t* bytes);
+    // hand to a receiver. `progress` (optional) reports uploaded bytes.
+    void upload_and_publish(const uint8_t* bytes, const ProgressFn& progress = {});
 
     const std::wstring& name() const noexcept { return name_; }
     uint64_t size() const noexcept { return size_; }

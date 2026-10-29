@@ -337,7 +337,7 @@ void TxSharedBuffer::create(GpuContext& ctx, const std::wstring& resource_name, 
              "ID3D12Resource::Map(upload)");
 }
 
-void TxSharedBuffer::upload_and_publish(const uint8_t* bytes) {
+void TxSharedBuffer::upload_and_publish(const uint8_t* bytes, const ProgressFn& progress) {
     if (!impl_ || !impl_->resource) throw GpuError("TxSharedBuffer::create was not called", -1);
     if (impl_->published) throw GpuError("buffer already published", -1);
 
@@ -390,6 +390,7 @@ void TxSharedBuffer::upload_and_publish(const uint8_t* bytes) {
         list->ResourceBarrier(1, &b);
         gpu->submit_and_wait(list.Get());
         off += n;
+        if (progress) progress(off, impl_->size);
     }
     D3D12_RANGE written{0, (SIZE_T)0};
     chunk->Unmap(0, &written);
@@ -410,7 +411,7 @@ void TxSharedBuffer::upload_and_publish(const uint8_t* bytes) {
     // Publish the identifier: process id + NT handle value. The receiver
     // duplicates this handle from our process (DuplicateHandle) and opens it.
     impl_->published = true;
-    name_ = L"gputxrx1:" + std::to_wstring(GetCurrentProcessId()) + L":" +
+    name_ = std::to_wstring(GetCurrentProcessId()) + L":" +
             std::to_wstring((unsigned long long)(uintptr_t)impl_->shared_handle);
     log_line("info", "shared resource created and published (" +
                          std::to_string(impl_->size) + " bytes)");
@@ -439,20 +440,24 @@ RxSharedBuffer::~RxSharedBuffer() = default;
 void RxSharedBuffer::open(GpuContext& ctx, const std::wstring& identifier) {
     if (impl_) throw GpuError("RxSharedBuffer already opened", -1);
 
-    // Identifier format: gputxrx1:<tx_pid>:<nt_handle_value>
-    if (identifier.rfind(L"gputxrx1:", 0) != 0)
-        throw GpuError("invalid identifier: expected format \"gputxrx1:<tx_pid>:<handle>\" "
+    // Identifier format: <tx_pid>:<nt_handle_value>. The legacy
+    // "gputxrx1:"-prefixed form is rejected with an actionable message.
+    if (identifier.rfind(L"gputxrx1:", 0) == 0)
+        throw GpuError("invalid identifier: the legacy \"gputxrx1:\" prefix is no longer "
+                       "supported; use \"<tx_pid>:<handle>\" exactly as printed by the "
+                       "transmitter",
+                       -1);
+    size_t sep = identifier.find(L':');
+    if (sep == std::wstring::npos)
+        throw GpuError("invalid identifier: expected format \"<tx_pid>:<handle>\" "
                        "(copy it exactly as printed by the transmitter)",
                        -1);
-    const size_t pid_pos = identifier.find(L':', 9);
-    if (pid_pos == std::wstring::npos)
-        throw GpuError("invalid identifier: missing transmitter pid", -1);
     DWORD pid = 0;
     unsigned long long handle_value = 0;
     try {
         size_t idx = 0;
-        pid = std::stoul(identifier.substr(9, pid_pos - 9), &idx);
-        handle_value = std::stoull(identifier.substr(pid_pos + 1), &idx, 10);
+        pid = std::stoul(identifier.substr(0, sep), &idx);
+        handle_value = std::stoull(identifier.substr(sep + 1), &idx, 10);
     } catch (const std::exception&) {
         throw GpuError("invalid identifier: pid/handle are not valid numbers", -1);
     }

@@ -8,8 +8,8 @@ prints a single identifier line, and the user copies that line into the
 receiver command.
 
 ```
-Terminal A:  gputxrx tx <payload_dir|payload_file>  -> prints  gputxrx1:<pid>:<handle>
-Terminal B:  gputxrx rx 'gputxrx1:<pid>:<handle>' [output_dir]
+Terminal A:  gputxrx tx <payload_dir|payload_file>  -> prints  <pid>:<handle>
+Terminal B:  gputxrx rx '<pid>:<handle>' [output_dir]
 ```
 
 `tx` accepts a directory or a single file of any type. Payload paths are
@@ -59,7 +59,7 @@ Terminal 1 — transmitter:
 #   limits: app max 2048.0 MiB, margin 256.0 MiB, safe limit 2048.0 MiB
 #
 # ================ COPY THIS IDENTIFIER ================
-# gputxrx1:39184:3016
+# 39184:3016
 # =======================================================
 #
 # Timings: enumerate 1 ms, hash+serialize 350 ms ...
@@ -70,7 +70,7 @@ Terminal 1 — transmitter:
 Terminal 2 — receiver:
 
 ```bash
-./build/Release/gputxrx.exe rx 'gputxrx1:39184:3016' /d/some/output_dir
+./build/Release/gputxrx.exe rx '39184:3016' /d/some/output_dir
 # output_dir defaults to the receiver's current working directory
 ```
 
@@ -80,6 +80,9 @@ Options:
   env `GPUTXRX_MAX_PAYLOAD_MB`).
 - `tx --margin-mb N` — VRAM safety margin kept unallocated (default 256 MiB;
   env `GPUTXRX_SAFETY_MARGIN_MB`).
+- Progress bars for the tx upload and rx readback are drawn on stderr
+  (percent, MiB, MiB/s) and suppressed when stderr is piped/redirected;
+  set `GPUTXRX_FORCE_PROGRESS=1` to force them on.
 
 What is transferred: every regular file under the payload directory,
 recursively — including hidden files, empty files, and dot-directories such as
@@ -105,7 +108,8 @@ driver 560.94, Windows 11) by `test_gpu_roundtrip` (Milestone 0 probe) and
    `CopyBufferRegion`; a **command-queue fence** (`ID3D12CommandQueue::Signal`
    + `SetEventOnCompletion` wait) guarantees the data is fully written and
    visible before the identifier is published.
-3. The identifier is the manually copied string `gputxrx1:<tx_pid>:<handle>`.
+3. The identifier is the manually copied string `<tx_pid>:<handle>` (the
+   legacy `gputxrx1:` prefix is no longer printed or accepted).
 4. The receiver parses the identifier, opens the transmitter process with
    `OpenProcess(PROCESS_DUP_HANDLE)`, duplicates the handle with
    `DuplicateHandle(DUPLICATE_SAME_ACCESS)`, and opens it as an

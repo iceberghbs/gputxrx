@@ -60,8 +60,8 @@ Win 11):
    `E_INVALIDARG` from `CreateCommittedResource1`. Only
    `ALLOW_RENDER_TARGET` is used.
 4. Cross-process `DuplicateHandle(PROCESS_DUP_HANDLE)` + `OpenSharedHandle`
-   works reliably; this is what the identifier `gputxrx1:<pid>:<handle>`
-   drives. All of this is exercised by `test_gpu_roundtrip`.
+   works reliably; this is what the identifier `<tx_pid>:<handle>` drives.
+   All of this is exercised by `test_gpu_roundtrip`.
 
 If you want to revisit named handles, write a scratch probe first and only
 change the design if it works cross-process on the target machine.

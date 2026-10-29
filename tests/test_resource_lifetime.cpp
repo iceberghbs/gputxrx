@@ -179,7 +179,8 @@ int wmain(int argc, wchar_t** argv) {
         return 1;
     }
     std::wstring id = read_line(tx.read_end);
-    expect(id.rfind(L"gputxrx1:", 0) == 0, "transmitter publishes an identifier");
+    expect(!id.empty() && id.find(L':') != std::wstring::npos,
+           "transmitter publishes a <pid>:<handle> identifier");
 
     // 2: receiver A verifies while transmitter is alive; then exits.
     int rc = run(L"\"" + self_path() + L"\" --rx-read \"" + id + L"\" " +

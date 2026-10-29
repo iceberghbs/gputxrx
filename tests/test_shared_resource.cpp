@@ -67,7 +67,7 @@ int wmain() {
     bool stale_rejected = false;
     try {
         RxSharedBuffer stale;
-        stale.open(*ctx, L"gputxrx1:4194303:1");
+        stale.open(*ctx, L"4194303:1");
     } catch (const std::exception& e) {
         stale_rejected = true;
         std::printf("       stale-identifier error: %s\n", e.what());

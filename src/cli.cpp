@@ -6,7 +6,9 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
+#include <io.h>
 #include <map>
 #include <optional>
 #include <string>
@@ -52,6 +54,75 @@ uint64_t env_or_flag_mb(const wchar_t* env_name, std::optional<uint64_t> flag_mb
     (void)what;
     return default_mb * (1ull << 20);
 }
+
+// ---------------------------------------------------------------------------
+// Progress bar
+// ---------------------------------------------------------------------------
+
+// Single-line bar drawn on stderr and redrawn in place with '\r'. Suppressed
+// when stderr is not a terminal (piped/redirected) so log files stay clean;
+// GPUTXRX_FORCE_PROGRESS=1 forces it on (useful for demos/testing).
+class ProgressBar {
+public:
+    explicit ProgressBar(const char* label, uint64_t total)
+        : label_(label), total_(total), t0_(hrc::now()) {
+        wchar_t buf[8] = {0};
+        bool force = GetEnvironmentVariableW(L"GPUTXRX_FORCE_PROGRESS", buf, 8) > 0 &&
+                     buf[0] == L'1';
+        enabled_ = total_ > 0 && (force || _isatty(_fileno(stderr)) != 0);
+    }
+
+    // Safety net: never leave a half-drawn bar line behind on early exit.
+    ~ProgressBar() {
+        if (enabled_ && drawn_ && !finished_) std::fputc('\n', stderr);
+    }
+
+    void update(uint64_t done) {
+        if (!enabled_ || done == 0) return;
+        done_ = done;
+        auto now = hrc::now();
+        if (!drawn_ || done == total_ || now - last_draw_ >= std::chrono::milliseconds(50)) {
+            draw();
+            last_draw_ = now;
+            drawn_ = true;
+        }
+    }
+
+    void finish() {
+        if (!enabled_) return;
+        done_ = total_;
+        draw();
+        std::fputc('\n', stderr);
+        finished_ = true;
+    }
+
+private:
+    void draw() {
+        double frac = total_ ? double(done_) / double(total_) : 1.0;
+        if (frac < 0.0) frac = 0.0;
+        if (frac > 1.0) frac = 1.0;
+        constexpr int kWidth = 36;
+        char bar[kWidth + 1];
+        int fill = int(frac * kWidth + 0.5);
+        for (int i = 0; i < kWidth; ++i) bar[i] = i < fill ? '#' : '-';
+        bar[kWidth] = '\0';
+        double secs = std::chrono::duration<double>(hrc::now() - t0_).count();
+        double mib = double(done_) / 1048576.0;
+        double rate = secs > 0.001 ? mib / secs : 0.0;
+        std::fprintf(stderr, "\r  %-8s [%s] %5.1f%%  %8.1f / %.1f MiB  %8.1f MiB/s", label_,
+                     bar, frac * 100.0, mib, double(total_) / 1048576.0, rate);
+        std::fflush(stderr);
+    }
+
+    const char* label_;
+    uint64_t total_;
+    uint64_t done_ = 0;
+    bool enabled_ = false;
+    bool drawn_ = false;
+    bool finished_ = false;
+    hrc::time_point t0_;
+    hrc::time_point last_draw_{};
+};
 
 // ---------------------------------------------------------------------------
 // tx
@@ -245,7 +316,10 @@ int run_tx(const std::wstring& dir_arg, const Limits& limits) {
     auto t_gpu = hrc::now();
     gpu::TxSharedBuffer tx;
     tx.create(*ctx, L"gputxrx", layout.total_size);
-    tx.upload_and_publish(buf.data());
+    ProgressBar upload_bar("upload:", layout.total_size);
+    tx.upload_and_publish(buf.data(),
+                          [&](uint64_t done, uint64_t) { upload_bar.update(done); });
+    upload_bar.finish();
     const double gpu_ms = ms_since(t_gpu);
     buf.clear();
     buf.shrink_to_fit();
@@ -309,12 +383,16 @@ int run_rx(const std::wstring& id_arg, const std::wstring& out_arg) {
                                                         resource_size));
     std::vector<uint8_t> chunk(size_t(kChunk), 0);
 
+    ProgressBar read_bar("readback:", resource_size);
+    uint64_t read_done = 0;
     auto read = [&](uint64_t off, uint32_t len) -> const uint8_t* {
         if (len == 0) return chunk.data();
         if (off > resource_size || len > resource_size - off)
             throw std::runtime_error("readback out of resource bounds");
         if (len > kChunk) throw std::runtime_error("internal error: read chunk too large");
         rx.read(off, chunk.data(), len);
+        read_done += len;
+        read_bar.update(read_done);
         return chunk.data();
     };
 
@@ -383,6 +461,7 @@ int run_rx(const std::wstring& id_arg, const std::wstring& out_arg) {
         out_dir, entries,
         [&](uint64_t off, uint32_t len) -> const uint8_t* { return read(off, len); }, crc);
     const double read2_ms = ms_since(t_read2);
+    read_bar.finish();
 
     // Whole-payload integrity.
     if (crc != hdr.payload_crc32)
