@@ -1,0 +1,7 @@
+build/
+out/
+install/bin/
+*.user
+*.suo
+.vs/
+probe_out.txt
