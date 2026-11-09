@@ -5,7 +5,8 @@ title gputxrx installer
 rem ============================================================
 rem  Double-click installer for gputxrx.
 rem  1. Builds the project if gputxrx.exe is not built yet.
-rem  2. Copies gputxrx.exe into install\bin.
+rem  2. Copies gputxrx.exe and the gputxdiff/gpurxdiff wrappers
+rem     into install\bin.
 rem  3. Adds install\bin to the *user* PATH (no admin needed),
 rem     so "gputxrx" works in any NEW terminal window.
 rem ============================================================
@@ -33,6 +34,14 @@ if errorlevel 1 goto :copyfail
 
 echo [gputxrx] copied to "%BIN_DIR%\gputxrx.exe"
 
+rem Incremental git-bundle transfer wrappers (gputxdiff / gpurxdiff).
+for %%F in (gputxdiff.cmd gputxdiff.ps1 gpurxdiff.cmd gpurxdiff.ps1) do (
+    if not exist "%~dp0%%F" goto :copyfail
+    copy /Y "%~dp0%%F" "%BIN_DIR%\%%F" >nul
+    if errorlevel 1 goto :copyfail
+)
+echo [gputxrx] copied gputxdiff / gpurxdiff wrappers to "%BIN_DIR%"
+
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0add_to_path.ps1" "%BIN_DIR%"
 if errorlevel 1 goto :pathfail
 
@@ -45,6 +54,8 @@ echo  Open a NEW terminal window and run:
 echo      gputxrx --help
 echo      gputxrx tx ^<directory^>
 echo      gputxrx rx ^<identifier^> --out ^<directory^>
+echo      gputxdiff ^<repo-dir^> ^<branch^> [^<branch^>...] ^<base-commit^>
+echo      gpurxdiff ^<repo-dir^> ^<identifier^>
 echo ============================================================
 echo.
 pause
@@ -63,7 +74,7 @@ exit /b 1
 
 :copyfail
 echo.
-echo [gputxrx] ERROR: could not copy gputxrx.exe to "%BIN_DIR%".
+echo [gputxrx] ERROR: could not copy a required file to "%BIN_DIR%".
 echo.
 pause
 exit /b 1

@@ -42,8 +42,9 @@ cmake --build build --config Release
 
 Double-click `install\install.bat` to build (if needed), copy
 `gputxrx.exe` to `install\bin\`, and add it to the user `PATH` so
-`gputxrx` works in any new terminal. See `install\README.md`;
-`install\uninstall.bat` reverts it.
+`gputxrx` works in any new terminal. The `gputxdiff` / `gpurxdiff`
+wrappers (next-but-one section) are installed alongside. See
+`install\README.md`; `install\uninstall.bat` reverts it.
 
 
 ## Usage (Git Bash)
@@ -90,6 +91,47 @@ recursively — including hidden files, empty files, and dot-directories such as
 (UTF-8 paths). Symbolic links and other reparse points are rejected with a
 clear error, never skipped or followed. Timestamps/permissions/alternate data
 streams are not preserved.
+
+## Incremental repo sync: gputxdiff / gpurxdiff
+
+Two wrapper scripts (installed by `install.bat`, also runnable directly from
+`install\`) combine `git bundle` with a gputxrx transfer — the "one machine
+online, one updated by hand" workflow. The online repo is at commit *n*, the
+offline one at commit *m*:
+
+```
+online machine:   gputxdiff <repo-dir> <branch> [<branch>...] <m>
+                   # bundles <branch>... minus m into
+                   #   %TEMP%\gputxrx-diff\<repo>_<b1-b2>_<m-short>.bundle
+                   # and transmits it with gputxrx tx (prints the identifier)
+
+offline machine:  gpurxdiff <repo-dir> '<pid>:<handle>'
+                   # gputxrx rx -> git bundle verify -> git fetch into
+                   #   refs/remotes/origin/* -> ff-only merge
+```
+
+- Same commit hashes as the online repo (objects are copied, never replayed):
+  no history rewrite, nothing to merge as long as the offline side stays
+  read-only.
+- A leading `^` on the base commit is accepted and stripped — the scripts
+  always use `--not` internally, so cmd.exe's `^`-escaping hazard never
+  applies.
+- The local bundle is deleted the moment the identifier banner appears (the
+  banner is printed only after the GPU upload is fence-confirmed) and kept on
+  any failure or early Ctrl+C. The transmitter then stays alive as usual
+  (`q`+Enter or Ctrl+C stops it). While piped, tx output arrives in one burst
+  when the upload completes (the progress bar self-suppresses; the GPU
+  diagnostics on stderr appear when tx exits).
+- `gpurxdiff` extracts into `%TEMP%\gputxrx-diff\rx-<timestamp>\`, verifies
+  the bundle (fails loudly if the repo is not on the bundle's base commit),
+  updates `refs/remotes/origin/<branch>` for every branch in the bundle — so
+  `git status` does not wrongly report "ahead of 'origin/main'" — and
+  fast-forwards the current branch when it is one of them (other branches
+  wait for `git checkout`). Staging is removed on success, kept on failure.
+- Extra `gputxrx tx` flags can be appended after the base commit, optionally
+  behind a `--` separator, e.g. `gputxdiff repo main abc1234 -- --max-payload-mb 512`.
+- Both scripts find `gputxrx.exe` on `PATH`, beside themselves, or in
+  `build\Release\`.
 
 ## Verified resource-sharing mechanism
 
