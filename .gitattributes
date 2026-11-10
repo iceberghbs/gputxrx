@@ -1,0 +1,3 @@
+# Git Bash shims must keep LF line endings (bash cannot parse CRLF scripts).
+install/gputxdiff text eol=lf
+install/gpurxdiff text eol=lf

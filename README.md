@@ -132,6 +132,12 @@ offline machine:  gpurxdiff <repo-dir> '<pid>:<handle>'
   behind a `--` separator, e.g. `gputxdiff repo main abc1234 -- --max-payload-mb 512`.
 - Both scripts find `gputxrx.exe` on `PATH`, beside themselves, or in
   `build\Release\`.
+- Works from cmd, PowerShell, and Git Bash. The install ships `.cmd`
+  launchers (they apply `-ExecutionPolicy Bypass` themselves), implementation
+  files renamed to `*.impl.ps1` so PowerShell's command resolution cannot
+  shadow the launchers with the raw `.ps1` (and hit the execution policy),
+  and extensionless shims so plain `gputxdiff` / `gpurxdiff` also work in
+  Git Bash (bash has no `PATHEXT`; `gputxdiff.cmd ...` works there too).
 
 ## Verified resource-sharing mechanism
 

@@ -1,0 +1,11 @@
+#!/bin/sh
+# gpurxdiff - Git Bash shim. bash has no PATHEXT, so a bare 'gpurxdiff'
+# cannot resolve gpurxdiff.cmd; this extensionless shim forwards to the
+# PowerShell implementation (with the execution policy bypassed).
+d=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -W 2>/dev/null) || {
+    d=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+    command -v cygpath >/dev/null 2>&1 && d=$(cygpath -m "$d")
+}
+impl="$d/gpurxdiff.impl.ps1"
+[ -f "$impl" ] || impl="$d/gpurxdiff.ps1"
+exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$impl" "$@"

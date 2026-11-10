@@ -35,9 +35,20 @@ if errorlevel 1 goto :copyfail
 echo [gputxrx] copied to "%BIN_DIR%\gputxrx.exe"
 
 rem Incremental git-bundle transfer wrappers (gputxdiff / gpurxdiff).
-for %%F in (gputxdiff.cmd gputxdiff.ps1 gpurxdiff.cmd gpurxdiff.ps1) do (
+rem The .ps1 implementations are installed as *.impl.ps1: PowerShell command
+rem resolution prefers a same-named .ps1 over the .cmd launcher in the same
+rem directory, which would bypass the launcher's -ExecutionPolicy Bypass.
+rem The extensionless files are Git Bash shims (bash has no PATHEXT).
+if exist "%BIN_DIR%\gputxdiff.ps1" del /F /Q "%BIN_DIR%\gputxdiff.ps1"
+if exist "%BIN_DIR%\gpurxdiff.ps1" del /F /Q "%BIN_DIR%\gpurxdiff.ps1"
+for %%F in (gputxdiff.cmd gputxdiff gpurxdiff.cmd gpurxdiff) do (
     if not exist "%~dp0%%F" goto :copyfail
     copy /Y "%~dp0%%F" "%BIN_DIR%\%%F" >nul
+    if errorlevel 1 goto :copyfail
+)
+for %%F in (gputxdiff gpurxdiff) do (
+    if not exist "%~dp0%%F.ps1" goto :copyfail
+    copy /Y "%~dp0%%F.ps1" "%BIN_DIR%\%%F.impl.ps1" >nul
     if errorlevel 1 goto :copyfail
 )
 echo [gputxrx] copied gputxdiff / gpurxdiff wrappers to "%BIN_DIR%"
