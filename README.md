@@ -122,6 +122,10 @@ offline machine:  gpurxdiff <repo-dir> '<pid>:<handle>'
   (`q`+Enter or Ctrl+C stops it). While piped, tx output arrives in one burst
   when the upload completes (the progress bar self-suppresses; the GPU
   diagnostics on stderr appear when tx exits).
+- In an interactive console the transmitter shares your console, so Ctrl+C
+  and `q`+Enter stop it directly. Under mintty (Git Bash) Ctrl+C cannot reach
+  native console applications at all (Windows limitation) — use `q`+Enter
+  there.
 - `gpurxdiff` extracts into `%TEMP%\gputxrx-diff\rx-<timestamp>\`, verifies
   the bundle (fails loudly if the repo is not on the bundle's base commit),
   updates `refs/remotes/origin/<branch>` for every branch in the bundle — so

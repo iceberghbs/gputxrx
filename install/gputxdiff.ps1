@@ -122,7 +122,12 @@ $psi.FileName = $txCmd
 $psi.UseShellExecute = $false
 $psi.RedirectStandardOutput = $true
 $psi.RedirectStandardError = $true
-$psi.CreateNoWindow = $true
+# CREATE_NO_WINDOW gives the child its OWN hidden console, which detaches it
+# from the user's console: Ctrl+C (a per-console event) and typed 'q' would
+# never reach it, leaving an unkillable transmitter. Only suppress the window
+# when our own stdout is redirected (automation/piped mode), where 'q' still
+# arrives via the pipe.
+$psi.CreateNoWindow = [Console]::IsOutputRedirected
 $argItems = @('tx', $bundlePath) + @($txFlags)
 $psi.Arguments = ($argItems | ForEach-Object { '"' + (([string]$_) -replace '"', '\"') + '"' }) -join ' '
 
